@@ -25,6 +25,7 @@ async function verifyWallet(config) {
         }
         
         console.log('✅ Verificación exitosa - La private key es correcta');
+        console.log('🧪 TEST - Blockhash:', (await connection.getLatestBlockhash()).blockhash);
         return fromWallet;
     } catch (error) {
         console.error('❌ Error verificando wallet:', error.message);
@@ -190,4 +191,5 @@ if (require.main === module) {
 }
 
 module.exports = { transferBGPTokens };
+
 
