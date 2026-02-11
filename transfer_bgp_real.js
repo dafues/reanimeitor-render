@@ -25,7 +25,6 @@ async function verifyWallet(config) {
         }
         
         console.log('✅ Verificación exitosa - La private key es correcta');
-        console.log('🧪 TEST - Blockhash:', (await connection.getLatestBlockhash()).blockhash);
         return fromWallet;
     } catch (error) {
         console.error('❌ Error verificando wallet:', error.message);
@@ -88,16 +87,19 @@ async function transferBGPTokens(toWallet, amount) {
             throw new Error('SOLANA_PRIVATE_KEY no configurada en .env');
         }
 
-        // 1. VERIFICAR QUE LA PRIVATE KEY ES CORRECTA
-        const fromWallet = await verifyWallet(config);
-        
-        // 2. Conectar a Solana
+        // 1. PRIMERO: Conectar a Solana
         const connection = new Connection(config.rpcUrl, 'confirmed');
         
-        // 3. Convertir amount a lamports
+        // 2. SEGUNDO: Verificar conexión con un blockhash
+        console.log('🧪 TEST - Blockhash:', (await connection.getLatestBlockhash()).blockhash);
+        
+        // 3. TERCERO: Verificar wallet
+        const fromWallet = await verifyWallet(config);
+        
+        // 4. Convertir amount a lamports
         const lamports = BigInt(Math.floor(amount * Math.pow(10, config.decimals)));
         
-        // 4. Obtener cuentas de token asociadas
+        // 5. Obtener cuentas de token asociadas
         const mintPublicKey = new PublicKey(config.bgpTokenMint);
         const toPublicKey = new PublicKey(toWallet);
         
@@ -106,7 +108,7 @@ async function transferBGPTokens(toWallet, amount) {
             fromWallet.publicKey
         );
         
-        // 5. Asegurar que la cuenta destino existe
+        // 6. Asegurar que la cuenta destino existe
         await ensureTokenAccount(connection, mintPublicKey, toPublicKey, fromWallet);
         
         const toTokenAccount = await getAssociatedTokenAddress(
@@ -118,7 +120,7 @@ async function transferBGPTokens(toWallet, amount) {
         console.log('   From ATA:', fromTokenAccount.toString());
         console.log('   To ATA:', toTokenAccount.toString());
 
-        // 6. Verificar balance de SOL
+        // 7. Verificar balance de SOL
         console.log('🔍 Verificando balance de SOL...');
         const solBalance = await connection.getBalance(fromWallet.publicKey);
         console.log('💰 SOL disponible:', solBalance / 1e9, 'SOL');
@@ -127,7 +129,7 @@ async function transferBGPTokens(toWallet, amount) {
             throw new Error(`SOL insuficiente para fee: ${solBalance / 1e9} SOL. Necesitas al menos 0.000005 SOL`);
         }
 
-        // 7. Verificar balance de BGP
+        // 8. Verificar balance de BGP
         const fromBalance = await connection.getTokenAccountBalance(fromTokenAccount);
         console.log('💰 Balance BGP disponible:', fromBalance.value.uiAmount, 'BGP');
 
@@ -135,7 +137,7 @@ async function transferBGPTokens(toWallet, amount) {
             throw new Error(`Balance insuficiente: ${fromBalance.value.uiAmount} BGP < ${amount} BGP`);
         }
 
-        // 8. Crear instrucción de transferencia
+        // 9. Crear instrucción de transferencia
         const transferInstruction = createTransferInstruction(
             fromTokenAccount,
             toTokenAccount,
@@ -143,7 +145,7 @@ async function transferBGPTokens(toWallet, amount) {
             lamports
         );
 
-        // 9. Crear y firmar transacción
+        // 10. Crear y firmar transacción
         const transaction = new Transaction().add(transferInstruction);
         
         console.log('✍️ Firmando transacción...');
@@ -191,5 +193,3 @@ if (require.main === module) {
 }
 
 module.exports = { transferBGPTokens };
-
-
