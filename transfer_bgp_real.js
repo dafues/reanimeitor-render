@@ -1,19 +1,55 @@
 const { Connection, Keypair, PublicKey, Transaction, sendAndConfirmTransaction } = require('@solana/web3.js');
-const { getAssociatedTokenAddress, createTransferInstruction } = require('@solana/spl-token');
+const { 
+    getAssociatedTokenAddress, 
+    createTransferInstruction,
+    createAssociatedTokenAccountInstruction  // ← AÑADIDO
+} = require('@solana/spl-token');
 const bs58 = require('bs58');
 require('dotenv').config({ path: __dirname + '/.env' });
+
+// ========== NUEVA FUNCIÓN: CREAR CUENTA TOKEN SI NO EXISTE ==========
+async function ensureTokenAccount(connection, mint, owner, payer) {
+    const ata = await getAssociatedTokenAddress(mint, owner);
+    
+    const accountInfo = await connection.getAccountInfo(ata);
+    
+    if (!accountInfo) {
+        console.log('📝 Creando cuenta token para destino...');
+        const transaction = new Transaction().add(
+            createAssociatedTokenAccountInstruction(
+                payer.publicKey,
+                ata,
+                owner,
+                mint
+            )
+        );
+        
+        const signature = await sendAndConfirmTransaction(
+            connection,
+            transaction,
+            [payer],
+            { commitment: 'confirmed' }
+        );
+        
+        console.log('✅ Cuenta token creada:', signature);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+    } else {
+        console.log('✅ Cuenta token destino ya existe');
+    }
+    
+    return ata;
+}
 
 async function transferBGPTokens(toWallet, amount) {
     try {
         // Configuración desde .env
-        // Configuración desde .env
-const config = {
-    rpcUrl: process.env.HELIUS_RPC_URL || `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY || '6a7ac70b-575a-4291-81f2-7b2cd0c2be26'}`,
-    privateKey: process.env.SOLANA_PRIVATE_KEY,
-    projectWallet: process.env.SOLANA_PROJECT_WALLET,
-    bgpTokenMint: process.env.BGP_TOKEN_MINT,
-    decimals: parseInt(process.env.BGP_TOKEN_DECIMALS || '9')
-};
+        const config = {
+            rpcUrl: process.env.HELIUS_RPC_URL || `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY || '6a7ac70b-575a-4291-81f2-7b2cd0c2be26'}`,
+            privateKey: process.env.SOLANA_PRIVATE_KEY,
+            projectWallet: process.env.SOLANA_PROJECT_WALLET,
+            bgpTokenMint: process.env.BGP_TOKEN_MINT,
+            decimals: parseInt(process.env.BGP_TOKEN_DECIMALS || '9')
+        };
 
         console.log('🔧 Configuración cargada');
         console.log('   RPC:', config.rpcUrl);
@@ -48,6 +84,9 @@ const config = {
             fromWallet.publicKey
         );
         
+        // ========== NUEVO: ASEGURAR QUE LA CUENTA DESTINO EXISTE ==========
+        await ensureTokenAccount(connection, mintPublicKey, toPublicKey, fromWallet);
+        
         const toTokenAccount = await getAssociatedTokenAddress(
             mintPublicKey,
             toPublicKey
@@ -56,14 +95,15 @@ const config = {
         console.log('📦 Cuentas de token obtenidas');
         console.log('   From ATA:', fromTokenAccount.toString());
         console.log('   To ATA:', toTokenAccount.toString());
-        // Verificar balance de SOL
-console.log('🔍 Verificando balance de SOL...');
-const solBalance = await connection.getBalance(fromWallet.publicKey);
-console.log('💰 SOL disponible:', solBalance / 1e9, 'SOL');
 
-if (solBalance < 5000) { // Mínimo 0.000005 SOL
-    throw new Error(`SOL insuficiente para fee: ${solBalance / 1e9} SOL. Necesitas al menos 0.000005 SOL`);
-}
+        // Verificar balance de SOL
+        console.log('🔍 Verificando balance de SOL...');
+        const solBalance = await connection.getBalance(fromWallet.publicKey);
+        console.log('💰 SOL disponible:', solBalance / 1e9, 'SOL');
+
+        if (solBalance < 5000) {
+            throw new Error(`SOL insuficiente para fee: ${solBalance / 1e9} SOL. Necesitas al menos 0.000005 SOL`);
+        }
 
         // 5. Verificar balance antes de transferir
         const fromBalance = await connection.getTokenAccountBalance(fromTokenAccount);
