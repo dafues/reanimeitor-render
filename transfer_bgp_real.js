@@ -1,4 +1,4 @@
-const { Connection, Keypair, PublicKey, Transaction, sendAndConfirmTransaction } = require('@solana/web3.js');const { Connection, Keypair, PublicKey, Transaction, sendAndConfirmTransaction } = require('@solana/web3.js');
+const { Connection, Keypair, PublicKey, Transaction, sendAndConfirmTransaction } = require('@solana/web3.js');
 const { 
     getAssociatedTokenAddress, 
     createTransferInstruction,
@@ -190,3 +190,4 @@ if (require.main === module) {
 }
 
 module.exports = { transferBGPTokens };
+
